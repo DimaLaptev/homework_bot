@@ -71,13 +71,15 @@ def check_response(response):
 def parse_status(homework):
     ...
 
-    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+    return f'The status of work verification has changed "{homework_name}". {verdict}'
 
 
 def main():
-    """Основная логика работы бота."""
+    """The main logic of the bot."""
 
-    ...
+    if not check_tokens():
+        raise ValueError('Token not found!')
+    
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
