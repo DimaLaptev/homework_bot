@@ -8,6 +8,8 @@ import telegram
 from telegram.ext import Updater, CommandHandler, CallbackContext
 from dotenv import load_dotenv
 
+import logging
+
 load_dotenv()
 
 
@@ -26,9 +28,29 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
+logging.basicConfig(
+    filename='program.log',
+    level=logging.DEBUG,
+    filemode='w',
+    format='%(asctime)s - %(levelname)s - %(message)s - %(name)s',
+)
 
 def check_tokens():
-    ...
+    '''checkout of tokens'''
+    items = ('PRACTICUM_TOKEN',
+             'TELEGRAM_TOKEN',
+             'TELEGRAM_CHAT_ID')
+    error_items = set()
+    for item in items:
+        if globals()[item] in None:
+            error_items.add(item)
+    if len(error_items) == 0:
+        return True
+    else:
+        logging.critical('Not found tokens of',
+                        f'{" ,".join(error_items)}')
+        return False
+
 
 
 def send_message(bot, message):
