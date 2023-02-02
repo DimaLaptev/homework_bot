@@ -34,6 +34,8 @@ logging.basicConfig(
     filemode='w',
     format='%(asctime)s - %(levelname)s - %(message)s - %(name)s',
 )
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
 
 def check_tokens():
     '''checkout of tokens'''
