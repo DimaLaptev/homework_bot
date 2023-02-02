@@ -23,9 +23,9 @@ HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
 
 HOMEWORK_VERDICTS = {
-    'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
-    'reviewing': 'Работа взята на проверку ревьюером.',
-    'rejected': 'Работа проверена: у ревьюера есть замечания.'
+    'approved': 'The work is verified: the reviewer liked everything!',
+    'reviewing': 'The work has been taken for review.',
+    'rejected': 'The work has been verified: there are comments.'
 }
 
 logging.basicConfig(
@@ -37,7 +37,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 
-def check_tokens():
+
+def checkout_tokens() -> bool:
     '''checkout of tokens'''
     items = ('PRACTICUM_TOKEN',
              'TELEGRAM_TOKEN',
@@ -49,7 +50,7 @@ def check_tokens():
     if len(error_items) == 0:
         return True
     else:
-        logging.critical('Not found tokens of',
+        logging.critical('Tokens not found',
                         f'{" ,".join(error_items)}')
         return False
 
