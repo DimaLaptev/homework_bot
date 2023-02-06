@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 
 
-def checkout_tokens() -> bool:
+def checkout_tokens():
     '''checkout of tokens'''
     items = ('PRACTICUM_TOKEN',
              'TELEGRAM_TOKEN',
@@ -51,13 +51,18 @@ def checkout_tokens() -> bool:
         return True
     else:
         logging.critical('Tokens not found',
-                        f'{" ,".join(error_items)}')
+                        f'{", ".join(error_items)}')
         return False
 
 
 
 def send_message(bot, message):
-    ...
+    '''Bot sending messsages'''
+    try:
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+        logger.info(f'this message was sent successfully - {message}')
+    except telegram.TelegramError as error:
+        logger.error(f'This message has not been sent - {message}')
 
 
 def get_api_answer(timestamp):
@@ -77,7 +82,7 @@ def parse_status(homework):
 def main():
     """The main logic of the bot."""
 
-    if not check_tokens():
+    if not checkout_tokens():
         raise ValueError('Token not found!')
     
 
@@ -88,7 +93,7 @@ def main():
 
     while True:
         try:
-
+            
             ...
 
         except Exception as error:
