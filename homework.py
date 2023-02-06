@@ -66,15 +66,39 @@ def send_message(bot, message):
 
 
 def get_api_answer(timestamp):
-    ...
+    '''Get of API-Data'''
+    params = {'from_date': timestamp}
+    try:
+        response = requests.get(
+            ENDPOINT,
+            headers=HEADERS,
+            params=params,
+        )
+        if response.status_code != http.HTTPStatus.OK:
+            logger.error('Page not found')
+            raise http.exceptions.HTTPError()
+        return response.json()
+    except requests.exceptions.ConnectionError:
+            logger.error('Error of Connection!')
+    except requests.exceptions.RequestException as error:
+        logger.error(f'Request error - {error}')
 
 
-def check_response(response):
-    ...
+def check_response(response: dict):
+    '''Checkout of API-response'''
+    if type(response) is not dict:
+        raise TypeError('Response-data is not dict!')
+    if type(response['homeworks']) is not list:
+        raise TypeError('"Homeworks" is not list!')
+    if response['homeworks'] == []:
+        return {}
+    if 'homeworks' not in response:
+        raise KeyError('Key "homeworks" not found in response-dict')
+    return response.get('homeworks')[0]
 
 
 def parse_status(homework):
-    ...
+    
 
     return f'The status of work verification has changed "{homework_name}". {verdict}'
 
