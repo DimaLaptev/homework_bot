@@ -1,21 +1,25 @@
+import sys
 import os
 import time
 
-import requests
-import http
-
-import telegram
-from telegram.ext import Updater, CommandHandler, CallbackContext
-from dotenv import load_dotenv
+import json
 
 import logging
+
+import requests
+from http import HTTPStatus
+
+import telegram
+
+from dotenv import load_dotenv
+
 
 load_dotenv()
 
 
-PRACTICUM_TOKEN: str = os.getenv('PRACTICUM_TOKEN')
-TELEGRAM_TOKEN: str = os.getenv('TELEGRAM_TOKEN')
-TELEGRAM_CHAT_ID: int = os.getenv('TELEGRAM_CHAT_ID')
+PRACTICUM_TOKEN = os.getenv('YA_TOKEN')
+TELEGRAM_TOKEN = os.getenv('TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_ID')
 
 RETRY_PERIOD: int = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
@@ -23,107 +27,151 @@ HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
 
 HOMEWORK_VERDICTS = {
-    'approved': 'The work is verified: the reviewer liked everything!',
-    'reviewing': 'The work has been taken for review.',
-    'rejected': 'The work has been verified: there are comments.'
+    'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
+    'reviewing': 'Работа взята на проверку ревьюером.',
+    'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-logging.basicConfig(
-    filename='program.log',
-    level=logging.DEBUG,
-    filemode='w',
-    format='%(asctime)s - %(levelname)s - %(message)s - %(name)s',
-)
+'''Custom exceptions.'''
+class RequestError(Exception):
+    def __init__(self, code_status):
+        self.code_status = code_status
+        super().__init__(f'Code API-request: {code_status}')
+
+
+class ApiError(Exception):
+    def __init__(self):
+        super().__init__('No access to API.')
+
+
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.INFO)
+formating = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+file_handler = logging.FileHandler('homeworks.log')
+file_handler.setFormatter(formating)
+logger.addHandler(file_handler)
+
+consol_handler = logging.StreamHandler(sys.stdout)
+consol_handler.setFormatter(formating)
+logger.addHandler(consol_handler)
 
 
-def checkout_tokens():
-    '''checkout of tokens'''
-    items = ('PRACTICUM_TOKEN',
-             'TELEGRAM_TOKEN',
-             'TELEGRAM_CHAT_ID')
-    error_items = set()
-    for item in items:
-        if globals()[item] in None:
-            error_items.add(item)
-    if len(error_items) == 0:
-        return True
-    else:
-        logging.critical('Tokens not found',
-                        f'{", ".join(error_items)}')
+def check_tokens():
+    """Tokens checkout."""
+    if (
+        PRACTICUM_TOKEN is None
+        or TELEGRAM_TOKEN is None
+        or TELEGRAM_CHAT_ID is None
+    ):
+        logger.critical('Tokens not found!')
         return False
-
+    return True
 
 
 def send_message(bot, message):
-    '''Bot sending messsages'''
+    """Bot sends a messsage."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
-        logger.info(f'this message was sent successfully - {message}')
     except telegram.TelegramError as error:
-        logger.error(f'This message has not been sent - {message}')
+        logger.error(
+            f'Message has not been sent: {error}')
+    else:
+        logging.debug('Message was sent successfully')
 
 
-def get_api_answer(timestamp):
-    '''Get of API-Data'''
+def get_api_answer(current_timestamp):
+    """Get of API-Data."""
+    timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
-        response = requests.get(
+        homework_statuses = requests.get(
             ENDPOINT,
             headers=HEADERS,
             params=params,
         )
-        if response.status_code != http.HTTPStatus.OK:
-            logger.error('Page not found')
-            raise http.exceptions.HTTPError()
-        return response.json()
-    except requests.exceptions.ConnectionError:
-            logger.error('Error of Connection!')
-    except requests.exceptions.RequestException as error:
-        logger.error(f'Request error - {error}')
+    except requests.RequestException as error:
+        message = f'Request not sent: {error}'
+        logger.error(message)
+        raise RequestError(message)
+    if homework_statuses.status_code != HTTPStatus.OK:
+        message = 'Response code is not 200!'
+        logger.error(message)
+        raise ApiError(message)
+    try:
+        return homework_statuses.json()
+    except json.decoder.JSONDecodeError:
+        message = 'JSON-format error!'
+        logger.error(message)
+        raise ValueError(message)
 
 
-def check_response(response: dict):
-    '''Checkout of API-response'''
-    if type(response) is not dict:
+def check_response(response):
+    """Checkout of API-response"""
+    try:
+        homeworks = response['homeworks']
+    except KeyError:
+        message = 'Key "homeworks" not found in response-data!'
+        logger.error(message)
+        raise KeyError(message)
+    if not isinstance(response, dict):
         raise TypeError('Response-data is not dict!')
-    if type(response['homeworks']) is not list:
-        raise TypeError('"Homeworks" is not list!')
-    if response['homeworks'] == []:
-        return {}
-    if 'homeworks' not in response:
-        raise KeyError('Key "homeworks" not found in response-dict')
-    return response.get('homeworks')[0]
+    if not isinstance(homeworks, list):
+        message = '"Homeworks" is not list!'
+        logger.error(message)
+        raise TypeError(message)
+    if len(homeworks) == 0:
+        message = 'Task list is empty.'
+        logger.error(message)
+    return homeworks
 
 
 def parse_status(homework):
-    
-
-    return f'The status of work verification has changed "{homework_name}". {verdict}'
+    """Return status of this work from 
+       the information about a particular homework."""
+    if 'homework_name' not in homework:
+        message = 'Key "homework_name" not found in response-dict!'
+        logger.error(message)
+        raise KeyError(message)
+    if 'status' not in homework:
+        message = 'Key "status" not found in response-dict!'
+        logger.error(message)
+        raise KeyError(message)
+    homework_name = homework['homework_name']
+    homework_status = homework['status']
+    if homework_status not in HOMEWORK_VERDICTS:
+        raise Exception(
+            f'Value not found in list of homeworks verdicts: ',
+            f'{homework_status}',
+        )
+    verdict = HOMEWORK_VERDICTS[homework_status]
+    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def main():
-    """The main logic of the bot."""
-
-    if not checkout_tokens():
-        raise ValueError('Token not found!')
-    
+    """Basic logic of bot."""
+    if not check_tokens():
+        raise KeyError('Required environment variable is missing')
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time())
-
-    ...
+    current_timestamp = int(time.time())
+    last_homework = 0
 
     while True:
         try:
-            
-            ...
-
+            response = get_api_answer(current_timestamp)
+            homework = check_response(response)
+            if homework != last_homework:
+                last_homework = homework
+                message = parse_status(homework[0])
+                send_message(bot, message)
+            current_timestamp = response.get('current_date')
+            print(message)
+            time.sleep(RETRY_PERIOD)
         except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            ...
-        ...
+            message = f'Program has been terminated: {error}'
+            send_message(bot, message)
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
