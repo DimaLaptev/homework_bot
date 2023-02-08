@@ -32,15 +32,19 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-'''Custom exceptions.'''
+
 class RequestError(Exception):
+    '''Custom exception requests.'''
     def __init__(self, code_status):
+        '''Custom init.'''
         self.code_status = code_status
         super().__init__(f'Code API-request: {code_status}')
 
 
 class ApiError(Exception):
+    '''Custom API-error exception.'''
     def __init__(self):
+        '''Custom init.'''
         super().__init__('No access to API.')
 
 
