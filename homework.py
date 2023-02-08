@@ -34,17 +34,19 @@ HOMEWORK_VERDICTS = {
 
 
 class RequestError(Exception):
-    '''Custom exception requests.'''
+    """Custom exception requests."""
+
     def __init__(self, code_status):
-        '''Custom init.'''
+        """Custom init."""
         self.code_status = code_status
         super().__init__(f'Code API-request: {code_status}')
 
 
 class ApiError(Exception):
-    '''Custom API-error exception.'''
+    """Custom API-error exception."""
+
     def __init__(self):
-        '''Custom init.'''
+        """Custom init."""
         super().__init__('No access to API.')
 
 
@@ -131,8 +133,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Return status of this work from 
-       the information about a particular homework."""
+    """Return status of homework."""
     if 'homework_name' not in homework:
         message = 'Key "homework_name" not found in response-dict!'
         logger.error(message)
@@ -145,7 +146,7 @@ def parse_status(homework):
     homework_status = homework['status']
     if homework_status not in HOMEWORK_VERDICTS:
         raise Exception(
-            f'Value not found in list of homeworks verdicts: ',
+            'Value not found in list of homeworks verdicts: ',
             f'{homework_status}',
         )
     verdict = HOMEWORK_VERDICTS[homework_status]
