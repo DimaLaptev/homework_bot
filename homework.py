@@ -113,7 +113,7 @@ def get_api_answer(current_timestamp):
 
 
 def check_response(response):
-    """Checkout of API-response"""
+    """Checkout of API-response."""
     try:
         homeworks = response['homeworks']
     except KeyError:
