@@ -1,21 +1,17 @@
 import sys
 import os
 import time
-
+import logging
+import http
 import json
 
-import logging
-
 import requests
-from http import HTTPStatus
-
 import telegram
-
 from dotenv import load_dotenv
 
+import exceptions
 
 load_dotenv()
-
 
 PRACTICUM_TOKEN = os.getenv('YA_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TOKEN')
@@ -33,23 +29,6 @@ HOMEWORK_VERDICTS = {
 }
 
 
-class RequestError(Exception):
-    """Custom exception requests."""
-
-    def __init__(self, code_status):
-        """Custom init."""
-        self.code_status = code_status
-        super().__init__(f'Code API-request: {code_status}')
-
-
-class ApiError(Exception):
-    """Custom API-error exception."""
-
-    def __init__(self):
-        """Custom init."""
-        super().__init__('No access to API.')
-
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 formating = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -63,30 +42,21 @@ consol_handler.setFormatter(formating)
 logger.addHandler(consol_handler)
 
 
-def check_tokens():
+def check_tokens() -> bool:
     """Tokens checkout."""
-    if (
-        PRACTICUM_TOKEN is None
-        or TELEGRAM_TOKEN is None
-        or TELEGRAM_CHAT_ID is None
-    ):
-        logger.critical('Tokens not found!')
-        return False
-    return True
+    return all((PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID))
 
 
-def send_message(bot, message):
+def send_message(bot: telegram.Bot, message: str) -> None:
     """Bot sends a messsage."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
-    except telegram.TelegramError as error:
-        logger.error(
-            f'Message has not been sent: {error}')
-    else:
         logging.debug('Message was sent successfully')
+    except telegram.TelegramError as error:
+        logger.error(f'Message has not been sent: {error}')
 
 
-def get_api_answer(current_timestamp):
+def get_api_answer(current_timestamp: int) -> dict:
     """Get of API-Data."""
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
@@ -99,11 +69,11 @@ def get_api_answer(current_timestamp):
     except requests.RequestException as error:
         message = f'Request not sent: {error}'
         logger.error(message)
-        raise RequestError(message)
-    if homework_statuses.status_code != HTTPStatus.OK:
+        raise exceptions.RequestError(message)
+    if homework_statuses.status_code != http.HTTPStatus.OK:
         message = 'Response code is not 200!'
         logger.error(message)
-        raise ApiError(message)
+        raise exceptions.ApiError(message)
     try:
         return homework_statuses.json()
     except json.decoder.JSONDecodeError:
@@ -112,40 +82,39 @@ def get_api_answer(current_timestamp):
         raise ValueError(message)
 
 
-def check_response(response):
+def check_response(response: dict) -> dict:
     """Checkout of API-response."""
+    if not isinstance(response, dict):
+        raise TypeError('Response-data is not dict!')
     try:
         homeworks = response['homeworks']
     except KeyError:
         message = 'Key "homeworks" not found in response-data!'
         logger.error(message)
         raise KeyError(message)
-    if not isinstance(response, dict):
-        raise TypeError('Response-data is not dict!')
     if not isinstance(homeworks, list):
         message = '"Homeworks" is not list!'
         logger.error(message)
         raise TypeError(message)
-    if len(homeworks) == 0:
+    if not homeworks:
         message = 'Task list is empty.'
         logger.error(message)
     return homeworks
 
 
-def parse_status(homework):
+def parse_status(homework: dict) -> str:
     """Return status of homework."""
-    if 'homework_name' not in homework:
-        message = 'Key "homework_name" not found in response-dict!'
-        logger.error(message)
-        raise KeyError(message)
-    if 'status' not in homework:
-        message = 'Key "status" not found in response-dict!'
-        logger.error(message)
-        raise KeyError(message)
-    homework_name = homework['homework_name']
-    homework_status = homework['status']
+    homework_name = homework.get('homework_name')
+    homework_status = homework.get('status')
+    if homework_name is None or homework_status is None:
+        logger.error(
+            'Expected key "homework_name" not found in response-dict!',
+        )
+        raise KeyError(
+            'Expected key "homework_name" not found in response-dict!',
+        )
     if homework_status not in HOMEWORK_VERDICTS:
-        raise Exception(
+        raise ValueError(
             'Value not found in list of homeworks verdicts: ',
             f'{homework_status}',
         )
@@ -153,9 +122,10 @@ def parse_status(homework):
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
-def main():
+def main() -> None:
     """Basic logic of bot."""
     if not check_tokens():
+        logger.critical('Tokens not found!')
         raise KeyError('Required environment variable is missing')
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
@@ -171,11 +141,11 @@ def main():
                 message = parse_status(homework[0])
                 send_message(bot, message)
             current_timestamp = response.get('current_date')
-            print(message)
             time.sleep(RETRY_PERIOD)
-        except Exception as error:
+        except exceptions.AnotherError as error:
             message = f'Program has been terminated: {error}'
             send_message(bot, message)
+        finally:
             time.sleep(RETRY_PERIOD)
 
 
