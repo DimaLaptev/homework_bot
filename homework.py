@@ -67,7 +67,7 @@ def get_api_answer(current_timestamp: int) -> dict:
             params=params,
         )
     except requests.RequestException as error:
-        message = f'Request not sent: {error}'
+        message = 'Request not sent!'
         logger.error(message)
         raise exceptions.RequestError(message)
     if homework_statuses.status_code != http.HTTPStatus.OK:
@@ -106,19 +106,19 @@ def parse_status(homework: dict) -> str:
     """Return status of homework."""
     homework_name = homework.get('homework_name')
     homework_status = homework.get('status')
-    if homework_name is None or homework_status is None:
+    if not all((homework_name, homework_status)):
         logger.error(
-            'Expected key "homework_name" not found in response-dict!',
+            'Expected keys not found in response-dict!',
         )
         raise KeyError(
-            'Expected key "homework_name" not found in response-dict!',
+            'Expected keys not found in response-dict!',
         )
-    if homework_status not in HOMEWORK_VERDICTS:
+    verdict = HOMEWORK_VERDICTS.get(homework_status)
+    if not verdict:
         raise ValueError(
             'Value not found in list of homeworks verdicts: ',
             f'{homework_status}',
         )
-    verdict = HOMEWORK_VERDICTS[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -142,7 +142,15 @@ def main() -> None:
                 send_message(bot, message)
             current_timestamp = response.get('current_date')
             time.sleep(RETRY_PERIOD)
-        except exceptions.AnotherError as error:
+        except(
+            TypeError,
+            KeyError,
+            ValueError,
+            telegram.TelegramError,
+            exceptions.RequestError,
+            exceptions.ApiError,
+            json.decoder.JSONDecodeError,
+        ) as error:
             message = f'Program has been terminated: {error}'
             send_message(bot, message)
         finally:
