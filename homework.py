@@ -66,7 +66,7 @@ def get_api_answer(current_timestamp: int) -> dict:
             headers=HEADERS,
             params=params,
         )
-    except requests.RequestException as error:
+    except requests.RequestException:
         message = 'Request not sent!'
         logger.error(message)
         raise exceptions.RequestError(message)
